@@ -1343,7 +1343,7 @@ visualizationCurveControllers.p2y = visualizationCurveFolder
 const sceneFolder = gui.addFolder('Scene')
 sceneFolder
   .add(params, 'gridDisplay')
-  .name('Grid Display')
+  .name('Grid')
   .onChange((value) => {
     gridHelper.visible = value
   })
@@ -1353,11 +1353,11 @@ sceneFolder
   .onChange(() => applyShadowSettings())
 sceneFolder
   .add(params, 'lightingScheme', Object.keys(LIGHTING_SCHEMES))
-  .name('Lighting Scheme')
+  .name('Lighting')
   .onChange((value) => applyLightingScheme(value))
 sceneFolder
   .addColor(params, 'backgroundColor')
-  .name('Scene Color')
+  .name('Background')
   .onChange(applyBackgroundColor)
 
 floorsFolder.open()
