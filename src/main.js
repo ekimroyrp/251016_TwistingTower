@@ -30,6 +30,8 @@ const LIGHTING_SCHEMES = {
       type: 'DirectionalLight',
       args: [0xffffff, 1.0],
       position: [60, 100, 40],
+      castShadow: true,
+      shadowMapSize: 2048,
     },
   ],
   Sunset: [
@@ -41,6 +43,9 @@ const LIGHTING_SCHEMES = {
       type: 'DirectionalLight',
       args: [0xff8c42, 0.8],
       position: [-80, 60, -20],
+      castShadow: true,
+      shadowMapSize: 2048,
+      shadowBias: -0.0015,
     },
     {
       type: 'AmbientLight',
@@ -56,6 +61,8 @@ const LIGHTING_SCHEMES = {
       type: 'DirectionalLight',
       args: [0x9ec9ff, 0.4],
       position: [30, 80, -50],
+      castShadow: true,
+      shadowMapSize: 1024,
     },
     {
       type: 'PointLight',
@@ -72,6 +79,8 @@ const LIGHTING_SCHEMES = {
       type: 'DirectionalLight',
       args: [0xffffff, 0.9],
       position: [70, 130, 40],
+      castShadow: true,
+      shadowMapSize: 2048,
     },
     {
       type: 'DirectionalLight',
@@ -89,6 +98,9 @@ const LIGHTING_SCHEMES = {
       args: [0x4cc9f0, 0.9],
       position: [-100, 60, 100],
       target: [0, 25, 0],
+      castShadow: true,
+      shadowMapSize: 2048,
+      shadowBias: -0.001,
     },
     {
       type: 'DirectionalLight',
@@ -510,6 +522,8 @@ class TowerGenerator {
       })
       this.geometry = new THREE.BufferGeometry()
       this.mesh = new THREE.Mesh(this.geometry, this.material)
+      this.mesh.castShadow = params.shadowsEnabled
+      this.mesh.receiveShadow = params.shadowsEnabled
       this.scene.add(this.mesh)
     } else if (!this.baseGeometry) {
       this.baseGeometry = new THREE.CylinderGeometry(
@@ -526,6 +540,9 @@ class TowerGenerator {
 
   updateInstances(params) {
     if (!this.mesh) return
+
+    this.mesh.castShadow = params.shadowsEnabled
+    this.mesh.receiveShadow = params.shadowsEnabled
 
     clampRotationCurve(params)
     clampSizeCurve(params)
@@ -775,6 +792,15 @@ gridHelper.renderOrder = -1
 gridHelper.position.y = 0
 scene.add(gridHelper)
 
+const shadowPlane = new THREE.Mesh(
+  new THREE.PlaneGeometry(2000, 2000),
+  new THREE.ShadowMaterial({ opacity: 0.35 }),
+)
+shadowPlane.rotation.x = -Math.PI / 2
+shadowPlane.position.y = 0.01
+shadowPlane.receiveShadow = true
+scene.add(shadowPlane)
+
 const params = {
   levels: 50,
   totalHeight: 100,
@@ -815,6 +841,7 @@ const params = {
   visualizationCurveP2Y: 1.0,
   backgroundColor: '#0f1016',
   gridDisplay: true,
+  shadowsEnabled: true,
   lightingScheme: 'Studio',
 }
 
@@ -832,6 +859,35 @@ const disposeActiveLights = () => {
     if (typeof light.dispose === 'function') light.dispose()
   }
   activeLights = []
+}
+
+const applyShadowSettings = () => {
+  renderer.shadowMap.enabled = params.shadowsEnabled
+  if (params.shadowsEnabled) {
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  }
+  shadowPlane.visible = params.shadowsEnabled
+  if (typeof tower !== 'undefined' && tower.mesh) {
+    tower.mesh.castShadow = params.shadowsEnabled
+    tower.mesh.receiveShadow = params.shadowsEnabled
+  }
+
+  for (const light of activeLights) {
+    if ('castShadow' in light) {
+      const canCast = Boolean(light.userData?.canCastShadow)
+      light.castShadow = params.shadowsEnabled && canCast
+      if (light.castShadow && light.shadow) {
+        const size = light.userData?.shadowMapSize || 1024
+        light.shadow.mapSize.set(size, size)
+        if (typeof light.userData?.shadowBias === 'number') {
+          light.shadow.bias = light.userData.shadowBias
+        }
+        if (typeof light.userData?.shadowNormalBias === 'number') {
+          light.shadow.normalBias = light.userData.shadowNormalBias
+        }
+      }
+    }
+  }
 }
 
 const applyLightingScheme = (schemeName = params.lightingScheme) => {
@@ -853,14 +909,31 @@ const applyLightingScheme = (schemeName = params.lightingScheme) => {
       light.target.position.set(...config.target)
       scene.add(light.target)
     }
-    if (config.castShadow && 'castShadow' in light) {
-      light.castShadow = true
+    light.userData.canCastShadow = Boolean(config.castShadow)
+    if (config.shadowMapSize) {
+      light.userData.shadowMapSize = config.shadowMapSize
+    }
+    if (typeof config.shadowBias === 'number') {
+      light.userData.shadowBias = config.shadowBias
+    }
+    if (typeof config.shadowNormalBias === 'number') {
+      light.userData.shadowNormalBias = config.shadowNormalBias
+    }
+    if (config.castShadow && light.shadow && light.shadow.camera) {
+      const cam = light.shadow.camera
+      if ('near' in cam) cam.near = 1
+      if ('far' in cam) cam.far = 400
+      if ('left' in cam) cam.left = -120
+      if ('right' in cam) cam.right = 120
+      if ('top' in cam) cam.top = 120
+      if ('bottom' in cam) cam.bottom = -120
     }
     scene.add(light)
     activeLights.push(light)
   }
 
   params.lightingScheme = schemeName
+  applyShadowSettings()
 }
 
 const applyBackgroundColor = () => {
@@ -1274,6 +1347,10 @@ sceneFolder
   .onChange((value) => {
     gridHelper.visible = value
   })
+sceneFolder
+  .add(params, 'shadowsEnabled')
+  .name('Shadows')
+  .onChange(() => applyShadowSettings())
 sceneFolder
   .add(params, 'lightingScheme', Object.keys(LIGHTING_SCHEMES))
   .name('Lighting Scheme')
