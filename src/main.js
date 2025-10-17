@@ -675,6 +675,20 @@ const sun = new THREE.DirectionalLight(0xffffff, 0.9)
 sun.position.set(60, 100, 40)
 scene.add(sun)
 
+const gridHelper = new THREE.GridHelper(2000, 400, 0x3a506b, 0x1b263b)
+const gridMaterials = Array.isArray(gridHelper.material)
+  ? gridHelper.material
+  : [gridHelper.material]
+gridMaterials.forEach((material) => {
+  material.transparent = true
+  material.opacity = 0.2
+  material.depthWrite = false
+  material.depthTest = true
+})
+gridHelper.renderOrder = -1
+gridHelper.position.y = 0
+scene.add(gridHelper)
+
 const params = {
   levels: 50,
   totalHeight: 100,
@@ -713,6 +727,7 @@ const params = {
   visualizationCurveP2X: 0.75,
   visualizationCurveP2Y: 1.0,
   backgroundColor: '#0f1016',
+  gridDisplay: true,
 }
 
 const applyBackgroundColor = () => {
@@ -726,6 +741,7 @@ const applyBackgroundColor = () => {
 const tower = new TowerGenerator(scene)
 tower.rebuild(params)
 applyBackgroundColor()
+gridHelper.visible = params.gridDisplay
 
 let rotationCurveEditor
 let sizeCurveEditor
@@ -1117,6 +1133,12 @@ vizFolder
   .addColor(params, 'backgroundColor')
   .name('Background Color')
   .onChange(applyBackgroundColor)
+vizFolder
+  .add(params, 'gridDisplay')
+  .name('Grid Display')
+  .onChange((value) => {
+    gridHelper.visible = value
+  })
 
 floorsFolder.open()
 sizeFolder.open()
