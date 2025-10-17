@@ -424,6 +424,7 @@ class TowerGenerator {
         1,
         params.radialSegments,
       )
+      this.baseGeometry.rotateY(Math.PI / 4)
       this.material = new THREE.MeshLambertMaterial({
         color: 0xffffff,
         vertexColors: true,
@@ -438,6 +439,7 @@ class TowerGenerator {
         1,
         params.radialSegments,
       )
+      this.baseGeometry.rotateY(Math.PI / 4)
     }
 
     this.updateInstances(params)
@@ -471,6 +473,7 @@ class TowerGenerator {
         params.radialSegments,
       )
       this.currentSegments = params.radialSegments
+      this.baseGeometry.rotateY(Math.PI / 4)
     }
 
     const effectiveHeight = Math.max(
@@ -616,6 +619,15 @@ class TowerGenerator {
     }
 
     const mergedGeometry = mergeGeometries(geometries, false)
+    const totalRotationRadians = THREE.MathUtils.degToRad(
+      params.totalRotation || 0,
+    )
+    if (totalRotationRadians !== 0) {
+      const totalRotationMatrix = new THREE.Matrix4().makeRotationY(
+        totalRotationRadians,
+      )
+      mergedGeometry.applyMatrix4(totalRotationMatrix)
+    }
     mergedGeometry.computeBoundingBox()
     mergedGeometry.computeBoundingSphere()
 
@@ -692,6 +704,7 @@ scene.add(gridHelper)
 const params = {
   levels: 50,
   totalHeight: 100,
+  totalRotation: 0,
   floorThickness: 1,
   baseRadius: 6,
   topRadius: 6,
@@ -826,7 +839,7 @@ const ensureVisualizationCurveEditor = () => {
       limits: VISUALIZATION_CURVE_LIMITS,
       clamp: clampVisualizationCurve,
       controllers: visualizationCurveControllers,
-      title: 'Visualization Curve',
+      title: 'Color Curve',
       startLabel: 'Base',
       endLabel: 'Top',
       handleColor: '#4cc9f0',
@@ -842,13 +855,17 @@ const ensureVisualizationCurveEditor = () => {
 }
 
 const gui = new GUI()
-gui.title('Tower Controls')
+gui.title('Controls')
 
 const floorsFolder = gui.addFolder('Floors')
 floorsFolder
   .add(params, 'totalHeight', 30, 400, 1)
   .name('Total Height')
   .onChange(() => tower.rebuild(params))
+floorsFolder
+  .add(params, 'totalRotation', -720, 720, 1)
+  .name('Total Rotation')
+  .onChange(() => tower.updateInstances(params))
 floorsFolder
   .add(params, 'levels', 3, 200, 1)
   .name('Floor Amount')
@@ -1045,20 +1062,20 @@ rotationCurveControllers.p2y = rotationCurveFolder
     tower.updateInstances(params)
   })
 
-const vizFolder = gui.addFolder('Visualization')
-vizFolder
+const colorFolder = gui.addFolder('Color')
+colorFolder
   .addColor(params, 'topColor')
   .name('Top Color')
   .onChange(() => tower.updateInstances(params))
-vizFolder
+colorFolder
   .addColor(params, 'baseColor')
   .name('Base Color')
   .onChange(() => tower.updateInstances(params))
-vizFolder
+colorFolder
   .add(params, 'visualizationGradientEase', Object.keys(easeFns))
-  .name('Visualization Gradient')
+  .name('Color Gradient')
   .onChange(() => tower.updateInstances(params))
-const visualizationCurveFolder = vizFolder.addFolder('Visualization Curve')
+const visualizationCurveFolder = colorFolder.addFolder('Color Curve')
 visualizationCurveControllers.enabled = visualizationCurveFolder
   .add(params, 'visualizationCurveEnabled')
   .name('Enable Curve')
@@ -1129,11 +1146,12 @@ visualizationCurveControllers.p2y = visualizationCurveFolder
     tower.updateInstances(params)
   })
 
-vizFolder
+const sceneFolder = gui.addFolder('Scene')
+sceneFolder
   .addColor(params, 'backgroundColor')
-  .name('Background Color')
+  .name('Scene Color')
   .onChange(applyBackgroundColor)
-vizFolder
+sceneFolder
   .add(params, 'gridDisplay')
   .name('Grid Display')
   .onChange((value) => {
