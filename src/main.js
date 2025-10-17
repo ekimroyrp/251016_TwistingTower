@@ -473,11 +473,13 @@ class TowerGenerator {
       this.currentSegments = params.radialSegments
     }
 
+    const effectiveHeight = Math.max(
+      params.totalHeight - params.floorThickness,
+      0,
+    )
     const spacing =
-      params.levels > 1
-        ? params.totalHeight / (params.levels - 1)
-        : params.totalHeight
-    const halfHeight = ((params.levels - 1) * spacing) / 2
+      params.levels > 1 ? effectiveHeight / (params.levels - 1) : 0
+    const baseCenterY = params.floorThickness / 2
 
     const sizeEase = easeFns[params.scaleEase] || easeFns.linear
     const rotationEase = easeFns[params.twistEase] || easeFns.linear
@@ -548,11 +550,7 @@ class TowerGenerator {
       quaternion.setFromAxisAngle(twistAxis, twistRadians)
       offsetVector.set(offset, 0, 0).applyQuaternion(quaternion)
 
-      position.set(
-        offsetVector.x,
-        -halfHeight + i * spacing,
-        offsetVector.z,
-      )
+      position.set(offsetVector.x, baseCenterY + i * spacing, offsetVector.z)
       scale.set(radius, params.floorThickness, radius)
 
       matrix.compose(position, quaternion, scale)
