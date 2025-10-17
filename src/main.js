@@ -18,6 +18,7 @@ const easeFns = {
 const ROTATION_CURVE_LIMITS = { xMin: 0, xMax: 1, yMin: 0, yMax: 1 }
 const SIZE_CURVE_LIMITS = { xMin: 0, xMax: 1, yMin: 0, yMax: 1 }
 const OFFSET_CURVE_LIMITS = { xMin: 0, xMax: 1, yMin: 0, yMax: 1 }
+const VISUALIZATION_CURVE_LIMITS = { xMin: 0, xMax: 1, yMin: 0, yMax: 1 }
 
 const clampCurveHandles = (params, prefix, limits) => {
   params[`${prefix}P1X`] = THREE.MathUtils.clamp(
@@ -48,6 +49,8 @@ const clampSizeCurve = (params) =>
   clampCurveHandles(params, 'sizeCurve', SIZE_CURVE_LIMITS)
 const clampOffsetCurve = (params) =>
   clampCurveHandles(params, 'offsetCurve', OFFSET_CURVE_LIMITS)
+const clampVisualizationCurve = (params) =>
+  clampCurveHandles(params, 'visualizationCurve', VISUALIZATION_CURVE_LIMITS)
 
 const evaluateCurveValue = (enabled, limits, p1x, p1y, p2x, p2y, t) => {
   if (!enabled) return null
@@ -444,6 +447,7 @@ class TowerGenerator {
     clampRotationCurve(params)
     clampSizeCurve(params)
     clampOffsetCurve(params)
+    clampVisualizationCurve(params)
 
     const matrix = new THREE.Matrix4()
     const position = new THREE.Vector3()
@@ -476,6 +480,8 @@ class TowerGenerator {
     const sizeEase = easeFns[params.scaleEase] || easeFns.linear
     const rotationEase = easeFns[params.twistEase] || easeFns.linear
     const offsetEase = easeFns[params.offsetEase] || easeFns.linear
+    const visualizationEase =
+      easeFns[params.visualizationGradientEase] || easeFns.linear
 
     const geometries = []
     let minY = Infinity
@@ -579,7 +585,24 @@ class TowerGenerator {
       for (let j = 0; j < positionAttribute.count; j += 1) {
         const y = positionAttribute.getY(j)
         const gradientT = THREE.MathUtils.clamp((y - minY) / range, 0, 1)
-        gradientColor.copy(fromColor).lerp(toColor, gradientT)
+        let adjustedGradientT = THREE.MathUtils.clamp(
+          visualizationEase(gradientT),
+          0,
+          1,
+        )
+        const visualizationCurveValue = evaluateCurveValue(
+          params.visualizationCurveEnabled,
+          VISUALIZATION_CURVE_LIMITS,
+          params.visualizationCurveP1X,
+          params.visualizationCurveP1Y,
+          params.visualizationCurveP2X,
+          params.visualizationCurveP2Y,
+          gradientT,
+        )
+        if (visualizationCurveValue !== null)
+          adjustedGradientT = visualizationCurveValue
+        adjustedGradientT = THREE.MathUtils.clamp(adjustedGradientT, 0, 1)
+        gradientColor.copy(fromColor).lerp(toColor, adjustedGradientT)
         const index = j * 3
         colorArray[index] = gradientColor.r
         colorArray[index + 1] = gradientColor.g
@@ -683,6 +706,12 @@ const params = {
   rotationCurveP2Y: 1.0,
   baseColor: '#5bc0be',
   topColor: '#f7b267',
+  visualizationGradientEase: 'linear',
+  visualizationCurveEnabled: false,
+  visualizationCurveP1X: 0.25,
+  visualizationCurveP1Y: 0.0,
+  visualizationCurveP2X: 0.75,
+  visualizationCurveP2Y: 1.0,
 }
 
 const tower = new TowerGenerator(scene)
@@ -691,10 +720,12 @@ tower.rebuild(params)
 let rotationCurveEditor
 let sizeCurveEditor
 let offsetCurveEditor
+let visualizationCurveEditor
 
 const rotationCurveControllers = {}
 const sizeCurveControllers = {}
 const offsetCurveControllers = {}
+const visualizationCurveControllers = {}
 
 const ensureRotationCurveEditor = () => {
   if (!rotationCurveEditor) {
@@ -706,6 +737,7 @@ const ensureRotationCurveEditor = () => {
       title: 'Rotation Curve',
       startLabel: 'Base',
       endLabel: 'Top',
+      handleColor: '#4cc9f0',
       onChange: () => tower.updateInstances(params),
       onClose: () => {
         params.rotationCurveEnabled = false
@@ -727,6 +759,7 @@ const ensureSizeCurveEditor = () => {
       title: 'Size Curve',
       startLabel: 'Base',
       endLabel: 'Top',
+      handleColor: '#4cc9f0',
       onChange: () => tower.updateInstances(params),
       onClose: () => {
         params.sizeCurveEnabled = false
@@ -758,6 +791,28 @@ const ensureOffsetCurveEditor = () => {
     })
   }
   return offsetCurveEditor
+}
+
+const ensureVisualizationCurveEditor = () => {
+  if (!visualizationCurveEditor) {
+    visualizationCurveEditor = new CurveEditor(params, {
+      prefix: 'visualizationCurve',
+      limits: VISUALIZATION_CURVE_LIMITS,
+      clamp: clampVisualizationCurve,
+      controllers: visualizationCurveControllers,
+      title: 'Visualization Curve',
+      startLabel: 'Base',
+      endLabel: 'Top',
+      handleColor: '#4cc9f0',
+      onChange: () => tower.updateInstances(params),
+      onClose: () => {
+        params.visualizationCurveEnabled = false
+        visualizationCurveControllers.enabled?.updateDisplay()
+        tower.updateInstances(params)
+      },
+    })
+  }
+  return visualizationCurveEditor
 }
 
 const gui = new GUI()
@@ -973,6 +1028,80 @@ vizFolder
   .addColor(params, 'baseColor')
   .name('Base Color')
   .onChange(() => tower.updateInstances(params))
+vizFolder
+  .add(params, 'visualizationGradientEase', Object.keys(easeFns))
+  .name('Visualization Gradient')
+  .onChange(() => tower.updateInstances(params))
+const visualizationCurveFolder = vizFolder.addFolder('Visualization Curve')
+visualizationCurveControllers.enabled = visualizationCurveFolder
+  .add(params, 'visualizationCurveEnabled')
+  .name('Enable Curve')
+  .onChange((value) => {
+    clampVisualizationCurve(params)
+    if (value) {
+      ensureVisualizationCurveEditor().show()
+      visualizationCurveEditor.syncFromParams()
+    } else if (visualizationCurveEditor) {
+      visualizationCurveEditor.hide()
+    }
+    tower.updateInstances(params)
+  })
+visualizationCurveControllers.p1x = visualizationCurveFolder
+  .add(
+    params,
+    'visualizationCurveP1X',
+    VISUALIZATION_CURVE_LIMITS.xMin,
+    VISUALIZATION_CURVE_LIMITS.xMax,
+    0.01,
+  )
+  .name('Handle 1 X')
+  .onChange(() => {
+    clampVisualizationCurve(params)
+    visualizationCurveEditor?.syncFromParams()
+    tower.updateInstances(params)
+  })
+visualizationCurveControllers.p1y = visualizationCurveFolder
+  .add(
+    params,
+    'visualizationCurveP1Y',
+    VISUALIZATION_CURVE_LIMITS.yMin,
+    VISUALIZATION_CURVE_LIMITS.yMax,
+    0.01,
+  )
+  .name('Handle 1 Y')
+  .onChange(() => {
+    clampVisualizationCurve(params)
+    visualizationCurveEditor?.syncFromParams()
+    tower.updateInstances(params)
+  })
+visualizationCurveControllers.p2x = visualizationCurveFolder
+  .add(
+    params,
+    'visualizationCurveP2X',
+    VISUALIZATION_CURVE_LIMITS.xMin,
+    VISUALIZATION_CURVE_LIMITS.xMax,
+    0.01,
+  )
+  .name('Handle 2 X')
+  .onChange(() => {
+    clampVisualizationCurve(params)
+    visualizationCurveEditor?.syncFromParams()
+    tower.updateInstances(params)
+  })
+visualizationCurveControllers.p2y = visualizationCurveFolder
+  .add(
+    params,
+    'visualizationCurveP2Y',
+    VISUALIZATION_CURVE_LIMITS.yMin,
+    VISUALIZATION_CURVE_LIMITS.yMax,
+    0.01,
+  )
+  .name('Handle 2 Y')
+  .onChange(() => {
+    clampVisualizationCurve(params)
+    visualizationCurveEditor?.syncFromParams()
+    tower.updateInstances(params)
+  })
 
 floorsFolder.open()
 sizeFolder.open()
