@@ -203,12 +203,14 @@ class CurveEditor {
   handleWindowPointerDown(event) {
     if (event.button !== 0 || event.target === this.closeBtn) return
     event.preventDefault()
-    const rect = this.overlay.getBoundingClientRect()
+
+    const overlayRect = this.overlay.getBoundingClientRect()
+    this.windowOffset.x = event.clientX - overlayRect.left
+    this.windowOffset.y = event.clientY - overlayRect.top
+
     this.draggingWindow = true
     this.windowPointerId = event.pointerId
     this.header.classList.add('dragging')
-    this.windowOffset.x = event.clientX - rect.left
-    this.windowOffset.y = event.clientY - rect.top
   }
 
   handleCanvasPointerDown(event) {
@@ -712,10 +714,20 @@ const params = {
   visualizationCurveP1Y: 0.0,
   visualizationCurveP2X: 0.75,
   visualizationCurveP2Y: 1.0,
+  backgroundColor: '#0f1016',
+}
+
+const applyBackgroundColor = () => {
+  if (!scene.background) {
+    scene.background = new THREE.Color(params.backgroundColor)
+  } else {
+    scene.background.set(params.backgroundColor)
+  }
 }
 
 const tower = new TowerGenerator(scene)
 tower.rebuild(params)
+applyBackgroundColor()
 
 let rotationCurveEditor
 let sizeCurveEditor
@@ -1102,6 +1114,11 @@ visualizationCurveControllers.p2y = visualizationCurveFolder
     visualizationCurveEditor?.syncFromParams()
     tower.updateInstances(params)
   })
+
+vizFolder
+  .addColor(params, 'backgroundColor')
+  .name('Background Color')
+  .onChange(applyBackgroundColor)
 
 floorsFolder.open()
 sizeFolder.open()

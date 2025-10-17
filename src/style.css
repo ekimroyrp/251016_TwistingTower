@@ -28,9 +28,8 @@ canvas {
 
 .curve-editor-overlay {
   position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  top: 16px;
+  left: 16px;
   width: 320px;
   padding: 16px;
   border-radius: 12px;
