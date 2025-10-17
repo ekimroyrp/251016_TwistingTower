@@ -20,6 +20,85 @@ const SIZE_CURVE_LIMITS = { xMin: 0, xMax: 1, yMin: 0, yMax: 1 }
 const OFFSET_CURVE_LIMITS = { xMin: 0, xMax: 1, yMin: 0, yMax: 1 }
 const VISUALIZATION_CURVE_LIMITS = { xMin: 0, xMax: 1, yMin: 0, yMax: 1 }
 
+const LIGHTING_SCHEMES = {
+  Studio: [
+    {
+      type: 'HemisphereLight',
+      args: [0xbdd2ff, 0x080820, 0.6],
+    },
+    {
+      type: 'DirectionalLight',
+      args: [0xffffff, 1.0],
+      position: [60, 100, 40],
+    },
+  ],
+  Sunset: [
+    {
+      type: 'HemisphereLight',
+      args: [0xffd2a8, 0x402a3a, 0.5],
+    },
+    {
+      type: 'DirectionalLight',
+      args: [0xff8c42, 0.8],
+      position: [-80, 60, -20],
+    },
+    {
+      type: 'AmbientLight',
+      args: [0x332244, 0.35],
+    },
+  ],
+  Midnight: [
+    {
+      type: 'HemisphereLight',
+      args: [0x183059, 0x04040a, 0.35],
+    },
+    {
+      type: 'DirectionalLight',
+      args: [0x9ec9ff, 0.4],
+      position: [30, 80, -50],
+    },
+    {
+      type: 'PointLight',
+      args: [0x4cc9f0, 0.6, 200],
+      position: [0, 30, 0],
+    },
+  ],
+  HighKey: [
+    {
+      type: 'AmbientLight',
+      args: [0xf0f4ff, 0.6],
+    },
+    {
+      type: 'DirectionalLight',
+      args: [0xffffff, 0.9],
+      position: [70, 130, 40],
+    },
+    {
+      type: 'DirectionalLight',
+      args: [0xffffff, 0.6],
+      position: [-50, 80, -30],
+    },
+  ],
+  RimLight: [
+    {
+      type: 'AmbientLight',
+      args: [0x1a1b25, 0.2],
+    },
+    {
+      type: 'DirectionalLight',
+      args: [0x4cc9f0, 0.9],
+      position: [-100, 60, 100],
+      target: [0, 25, 0],
+    },
+    {
+      type: 'DirectionalLight',
+      args: [0xf72585, 0.7],
+      position: [100, 40, -100],
+      target: [0, 25, 0],
+    },
+  ],
+}
+
 const clampCurveHandles = (params, prefix, limits) => {
   params[`${prefix}P1X`] = THREE.MathUtils.clamp(
     params[`${prefix}P1X`],
@@ -682,11 +761,6 @@ controls.enableDamping = true
 controls.dampingFactor = 0.08
 controls.target.set(0, 20, 0)
 
-scene.add(new THREE.HemisphereLight(0xbdd2ff, 0x080820, 0.7))
-const sun = new THREE.DirectionalLight(0xffffff, 0.9)
-sun.position.set(60, 100, 40)
-scene.add(sun)
-
 const gridHelper = new THREE.GridHelper(2000, 400, 0x3a506b, 0x1b263b)
 const gridMaterials = Array.isArray(gridHelper.material)
   ? gridHelper.material
@@ -731,8 +805,8 @@ const params = {
   rotationCurveP1Y: 0.0,
   rotationCurveP2X: 0.75,
   rotationCurveP2Y: 1.0,
-  baseColor: '#5bc0be',
-  topColor: '#f7b267',
+  baseColor: '#00fffb',
+  topColor: '#ff8400',
   visualizationGradientEase: 'linear',
   visualizationCurveEnabled: false,
   visualizationCurveP1X: 0.25,
@@ -741,6 +815,52 @@ const params = {
   visualizationCurveP2Y: 1.0,
   backgroundColor: '#0f1016',
   gridDisplay: true,
+  lightingScheme: 'Studio',
+}
+
+let activeLights = []
+
+const disposeActiveLights = () => {
+  for (const light of activeLights) {
+    scene.remove(light)
+    if (
+      light.target &&
+      (light.isDirectionalLight || light.isSpotLight || light.isRectAreaLight)
+    ) {
+      scene.remove(light.target)
+    }
+    if (typeof light.dispose === 'function') light.dispose()
+  }
+  activeLights = []
+}
+
+const applyLightingScheme = (schemeName = params.lightingScheme) => {
+  const scheme = LIGHTING_SCHEMES[schemeName] || LIGHTING_SCHEMES.Studio
+  disposeActiveLights()
+
+  for (const config of scheme) {
+    const LightConstructor = THREE[config.type]
+    if (typeof LightConstructor !== 'function') continue
+    const args = Array.isArray(config.args) ? config.args : []
+    const light = new LightConstructor(...args)
+    if (config.position) {
+      light.position.set(...config.position)
+    }
+    if (
+      config.target &&
+      (light.isDirectionalLight || light.isSpotLight || light.isRectAreaLight)
+    ) {
+      light.target.position.set(...config.target)
+      scene.add(light.target)
+    }
+    if (config.castShadow && 'castShadow' in light) {
+      light.castShadow = true
+    }
+    scene.add(light)
+    activeLights.push(light)
+  }
+
+  params.lightingScheme = schemeName
 }
 
 const applyBackgroundColor = () => {
@@ -755,6 +875,7 @@ const tower = new TowerGenerator(scene)
 tower.rebuild(params)
 applyBackgroundColor()
 gridHelper.visible = params.gridDisplay
+applyLightingScheme()
 
 let rotationCurveEditor
 let sizeCurveEditor
@@ -1157,6 +1278,10 @@ sceneFolder
   .onChange((value) => {
     gridHelper.visible = value
   })
+sceneFolder
+  .add(params, 'lightingScheme', Object.keys(LIGHTING_SCHEMES))
+  .name('Lighting Scheme')
+  .onChange((value) => applyLightingScheme(value))
 
 floorsFolder.open()
 sizeFolder.open()
