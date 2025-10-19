@@ -1087,6 +1087,74 @@ const triggerSceneMeshDownload = () => {
   }
 }
 
+const savedStates = []
+const savedStateSelection = { selected: '' }
+let savedStateController
+
+const syncCurveEditorsWithParams = () => {
+  if (params.sizeCurveEnabled) {
+    ensureSizeCurveEditor().show()
+    sizeCurveEditor.syncFromParams()
+  } else if (sizeCurveEditor) {
+    sizeCurveEditor.hide()
+  }
+
+  if (params.offsetCurveEnabled) {
+    ensureOffsetCurveEditor().show()
+    offsetCurveEditor.syncFromParams()
+  } else if (offsetCurveEditor) {
+    offsetCurveEditor.hide()
+  }
+
+  if (params.rotationCurveEnabled) {
+    ensureRotationCurveEditor().show()
+    rotationCurveEditor.syncFromParams()
+  } else if (rotationCurveEditor) {
+    rotationCurveEditor.hide()
+  }
+
+  if (params.visualizationCurveEnabled) {
+    ensureVisualizationCurveEditor().show()
+    visualizationCurveEditor.syncFromParams()
+  } else if (visualizationCurveEditor) {
+    visualizationCurveEditor.hide()
+  }
+}
+
+const applySavedState = (snapshot) => {
+  Object.assign(params, JSON.parse(JSON.stringify(snapshot)))
+
+  clampRotationCurve(params)
+  clampSizeCurve(params)
+  clampOffsetCurve(params)
+  clampVisualizationCurve(params)
+
+  if (typeof gui.controllersRecursive === 'function') {
+    gui.controllersRecursive().forEach((controller) => controller.updateDisplay())
+  }
+
+  syncCurveEditorsWithParams()
+
+  tower.rebuild(params)
+  gridHelper.visible = params.gridDisplay
+  applyShadowSettings()
+  applyLightingScheme(params.lightingScheme)
+  applyBackgroundColor()
+}
+
+const saveCurrentState = () => {
+  const snapshot = JSON.parse(JSON.stringify(params))
+  const label = `State ${savedStates.length + 1}`
+  savedStates.push({ label, snapshot })
+
+  if (savedStateController) {
+    savedStateController.options(savedStates.map((entry) => entry.label))
+    savedStateController.enable()
+    savedStateSelection.selected = label
+    savedStateController.setValue(label)
+  }
+}
+
 const gui = new GUI()
 gui.title('Controls')
 
@@ -1402,10 +1470,20 @@ sceneFolder
 const saveOptions = {
   image: triggerSceneImageDownload,
   mesh: triggerSceneMeshDownload,
+  state: saveCurrentState,
 }
 const saveFolder = gui.addFolder('Save')
 saveFolder.add(saveOptions, 'image').name('Image')
 saveFolder.add(saveOptions, 'mesh').name('Mesh')
+saveFolder.add(saveOptions, 'state').name('State')
+savedStateController = saveFolder
+  .add(savedStateSelection, 'selected', [])
+  .name('Saved States')
+  .onChange((label) => {
+    const entry = savedStates.find((state) => state.label === label)
+    if (entry) applySavedState(entry.snapshot)
+  })
+savedStateController.disable()
 
 floorsFolder.open()
 sizeFolder.open()
