@@ -767,7 +767,7 @@ scene.background = new THREE.Color(0x0f1016)
 const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000)
 camera.position.set(60, 60, 60)
 
-const renderer = new THREE.WebGLRenderer({ antialias: true })
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true })
 renderer.setPixelRatio(window.devicePixelRatio)
 renderer.setSize(window.innerWidth, window.innerHeight)
 renderer.outputColorSpace = THREE.SRGBColorSpace
@@ -1046,6 +1046,22 @@ const ensureVisualizationCurveEditor = () => {
     })
   }
   return visualizationCurveEditor
+}
+
+const triggerSceneImageDownload = () => {
+  try {
+    renderer.render(scene, camera)
+    const dataUrl = renderer.domElement.toDataURL('image/png')
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const link = document.createElement('a')
+    link.href = dataUrl
+    link.download = `scene-${timestamp}.png`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  } catch (error) {
+    console.error('Unable to export scene image:', error)
+  }
 }
 
 const gui = new GUI()
@@ -1359,6 +1375,10 @@ sceneFolder
   .addColor(params, 'backgroundColor')
   .name('Background')
   .onChange(applyBackgroundColor)
+
+const saveOptions = { image: triggerSceneImageDownload }
+const saveFolder = gui.addFolder('Save')
+saveFolder.add(saveOptions, 'image').name('Image')
 
 floorsFolder.open()
 sizeFolder.open()
