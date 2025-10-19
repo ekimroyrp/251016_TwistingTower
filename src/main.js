@@ -3,6 +3,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { GUI } from 'lil-gui'
+import { exportMeshToOBJ } from './utils/exportOBJ.js'
 
 const easeFns = {
   linear: (t) => t,
@@ -1064,6 +1065,28 @@ const triggerSceneImageDownload = () => {
   }
 }
 
+const triggerSceneMeshDownload = () => {
+  try {
+    tower.updateInstances(params)
+    if (!tower.mesh) {
+      console.warn('No mesh available to export.')
+      return
+    }
+    const objData = exportMeshToOBJ(tower.mesh)
+    const blob = new Blob([objData], { type: 'text/plain' })
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `scene-${timestamp}.obj`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(link.href)
+  } catch (error) {
+    console.error('Unable to export mesh OBJ:', error)
+  }
+}
+
 const gui = new GUI()
 gui.title('Controls')
 
@@ -1376,9 +1399,13 @@ sceneFolder
   .name('Background')
   .onChange(applyBackgroundColor)
 
-const saveOptions = { image: triggerSceneImageDownload }
+const saveOptions = {
+  image: triggerSceneImageDownload,
+  mesh: triggerSceneMeshDownload,
+}
 const saveFolder = gui.addFolder('Save')
 saveFolder.add(saveOptions, 'image').name('Image')
+saveFolder.add(saveOptions, 'mesh').name('Mesh')
 
 floorsFolder.open()
 sizeFolder.open()
