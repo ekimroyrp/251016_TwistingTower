@@ -1088,7 +1088,8 @@ const triggerSceneMeshDownload = () => {
 }
 
 const savedStates = []
-const savedStateSelection = { selected: '' }
+const savedStatePlaceholder = 'Select State'
+const savedStateSelection = { selected: savedStatePlaceholder }
 let savedStateController
 
 const syncCurveEditorsWithParams = () => {
@@ -1148,10 +1149,11 @@ const saveCurrentState = () => {
   savedStates.push({ label, snapshot })
 
   if (savedStateController) {
-    savedStateController.options(savedStates.map((entry) => entry.label))
+    const optionLabels = [savedStatePlaceholder, ...savedStates.map((entry) => entry.label)]
+    savedStateController.options(optionLabels)
     savedStateController.enable()
-    savedStateSelection.selected = label
-    savedStateController.setValue(label)
+    savedStateSelection.selected = savedStatePlaceholder
+    savedStateController.setValue(savedStatePlaceholder)
   }
 }
 
@@ -1477,9 +1479,10 @@ saveFolder.add(saveOptions, 'image').name('Image')
 saveFolder.add(saveOptions, 'mesh').name('Mesh')
 saveFolder.add(saveOptions, 'state').name('State')
 savedStateController = saveFolder
-  .add(savedStateSelection, 'selected', [])
+  .add(savedStateSelection, 'selected', [savedStatePlaceholder])
   .name('Saved States')
   .onChange((label) => {
+    if (label === savedStatePlaceholder) return
     const entry = savedStates.find((state) => state.label === label)
     if (entry) applySavedState(entry.snapshot)
   })
