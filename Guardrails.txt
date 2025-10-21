@@ -1,0 +1,3 @@
+Don't push to github unless I tell you to.
+Don't pull from github unless I tell you to.
+ALways push and pull with git from my account ekimroyrp with the email ekimroyrp@gmail.com.
