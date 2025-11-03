@@ -20,3 +20,9 @@ lerna-debug.log*
 *.njsproj
 *.sln
 *.sw?
+
+# Generated build artifacts
+dist/
+
+# Dependency directories
+node_modules/
