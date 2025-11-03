@@ -24,3 +24,8 @@
 - **Color:** Choose base/top colors, switch gradient easing, and enable a color curve for advanced transitions.
 - **Scene:** Toggle the ground grid, turn shadows on or off, swap lighting schemes, and recolor the background.
 - **Save:** Export a PNG image, download the generated OBJ mesh, or store and reload parameter snapshots from the GUI.
+
+## Deployment
+- **Local build preview:** `npm install` then `npm run dev` for hot-reload development, or `npm run build && npm run preview` to serve the production bundle locally.
+- **Publish to GitHub Pages:** From `main`, run `npm run build`, switch to the `gh-pages` branch, replace its contents with the `dist/` output, commit, and `git push origin gh-pages`. Return to `main` afterwards to keep the source tree intact.
+- **Live demo:** https://ekimroyrp.github.io/251016_TwistingTower/
